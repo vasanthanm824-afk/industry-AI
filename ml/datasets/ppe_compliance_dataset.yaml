@@ -1,0 +1,18 @@
+# Industrial Safety Worker & PPE Detection Dataset Configuration
+path: ../data/ppe_dataset  # dataset root dir
+train: images/train        # train images (relative to 'path')
+val: images/val            # val images (relative to 'path')
+test: images/test          # test images (relative to 'path')
+
+# Classes mapping
+names:
+  0: person
+  1: helmet
+  2: no_helmet
+  3: vest
+  4: no_vest
+  5: gloves
+  6: no_gloves
+  7: goggles
+  8: mask
+  9: boots

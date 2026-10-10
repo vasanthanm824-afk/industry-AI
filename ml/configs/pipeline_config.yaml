@@ -1,0 +1,73 @@
+# Pipeline Configuration for Industrial Worker Safety System (Step 1)
+
+input:
+  # Source can be: 
+  # - integer 0, 1 for local webcams
+  # - path to video file (e.g., "data/sample_videos/workers.mp4")
+  # - RTSP URL (e.g., "rtsp://admin:pass@192.168.1.50:554/stream")
+  source: 0
+  # Target capture resolution (null preserves native stream resolution)
+  target_width: null
+  target_height: null
+  # Loop video file continuously for testing (ignored for webcam/rtsp)
+  loop: false
+
+detector:
+  # Path to YOLO model checkpoint (pre-trained person detector or custom fine-tuned)
+  model_path: "ml/weights/yolov8n.pt"
+  # Confidence threshold for person detection
+  confidence_threshold: 0.35
+  # Non-maximum suppression (NMS) IoU threshold
+  iou_threshold: 0.45
+  # Target class IDs to detect (0 corresponds to "person" in standard COCO)
+  target_classes: [0]
+  # Device: "cpu", "cuda", or "auto"
+  device: "cpu"
+
+tracker:
+  # Tracker algorithm: "bytetrack" or "botsort"
+  tracker_type: "bytetrack"
+  # Path to tracker configuration file
+  config_path: "ml/configs/bytetrack.yaml"
+
+output:
+  # Display live visual window
+  show_display: true
+  window_title: "AI Industrial Safety - Worker Detection & Tracking"
+  # Save annotated output video
+  save_video: false
+  output_path: "output/tracked_output.mp4"
+  # Output video FPS (null matches input source FPS)
+  output_fps: null
+
+annotator:
+  # Visual styling
+  box_thickness: 2
+  font_scale: 0.55
+  # Show detection confidence score next to track ID
+  show_confidence: true
+  # Draw centroid motion trail (number of historical points, 0 to disable)
+  trail_length: 20
+  # Display HUD statistics card in upper-left corner
+  show_hud: true
+
+identifier:
+  # Model checkpoint for deep feature extraction
+  model_path: "ml/weights/yolov8n-cls.pt"
+  # Directory where enrolled worker embeddings are stored
+  embeddings_dir: "data/embeddings"
+  # Cosine similarity threshold below which a candidate is marked as UNKNOWN
+  # Empirically calibrated: genuine match > 0.99, non-match/stranger < 0.97
+  confidence_threshold: 0.98
+  # Consecutive frames required to verify and lock worker identity
+  temporal_consensus_frames: 5
+  # Run identification inference every N frames to save CPU cycles (1 = every frame)
+  interval: 1
+  device: "cpu"
+
+attendance:
+  # Enable automatic attendance marking
+  enabled: true
+  # Only mark attendance after temporal verification confirms identity
+  require_verified: true
+

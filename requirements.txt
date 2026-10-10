@@ -1,0 +1,26 @@
+# AI Industrial Worker Safety and Monitoring System - Core CV / ML Dependencies
+# Python >= 3.10 recommended
+
+# Computer Vision & Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics>=8.2.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+lap>=0.5.12
+
+# Database & ORM
+SQLAlchemy>=2.0.0
+
+# API & Web Framework
+fastapi>=0.110.0
+uvicorn>=0.28.0
+python-multipart>=0.0.9
+PyJWT>=2.8.0
+
+# Configuration & Utilities
+PyYAML>=6.0
+pydantic>=2.0.0
+tqdm>=4.65.0
+requests>=2.31.0
+

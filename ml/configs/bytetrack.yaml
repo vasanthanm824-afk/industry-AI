@@ -1,0 +1,20 @@
+# ByteTrack tracker configuration for industrial worker monitoring
+tracker_type: bytetrack
+
+# Threshold for the first association step (high confidence detections)
+track_high_thresh: 0.5
+
+# Threshold for the second association step (low confidence detections)
+track_low_thresh: 0.1
+
+# Threshold to initialize a new tracklet if unconfirmed
+new_track_thresh: 0.6
+
+# Buffer size (number of frames to retain lost tracks before deleting them)
+track_buffer: 30
+
+# Matching threshold (IoU threshold for association)
+match_thresh: 0.8
+
+# Fuse detection score with similarity
+fuse_score: true
