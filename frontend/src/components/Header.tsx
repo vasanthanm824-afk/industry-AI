@@ -45,17 +45,15 @@ export default function Header() {
 
   const getPageTitle = () => {
     switch (pathname) {
-      case '/dashboard': return 'Operations Center';
-      case '/cctv': return 'Live CCTV Camera Feed & Telemetry';
-      case '/workers': return 'Worker Directory & Enrollment';
-      case '/attendance': return 'Shift Attendance Records';
-      case '/ppe': return 'PPE Compliance Verification';
-      case '/zones': return 'Industrial Geofencing & Zones';
-      case '/incidents': return 'Safety Violations & Incident Action';
-      case '/alerts': return 'Manager Alert Center';
-      case '/weather': return 'Meteorological Risk Monitoring';
-      case '/reports': return 'Official Compliance & Auditing Reports';
-      default: return 'Safety Vision Platform';
+      case '/dashboard': return 'SENTINEL-X — Project Manager Safety Dashboard';
+      case '/cctv': return 'SENTINEL-X — Live Camera PPE & Attendance Monitoring';
+      case '/workers': return 'SENTINEL-X — Worker Management & Biometrics';
+      case '/attendance': return 'SENTINEL-X — Shift Attendance Roster';
+      case '/ppe': return 'SENTINEL-X — PPE Safety Verification';
+      case '/incidents': return 'SENTINEL-X — Safety Violations & Incident Logs';
+      case '/weather': return 'SENTINEL-X — Environmental Weather & Sensors';
+      case '/settings': return 'SENTINEL-X — System Calibration & Settings';
+      default: return 'SENTINEL-X — Smart Industrial Safety System';
     }
   };
 

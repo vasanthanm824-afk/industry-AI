@@ -5,12 +5,48 @@ enrolled worker references, handles UNKNOWN detection, and provides temporal con
 """
 
 from collections import defaultdict, deque
+import json
 import os
 from typing import Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 import torch
 from ultralytics import YOLO
+
+from .quality_checker import quality_checker
+
+
+class IdentificationResult(tuple):
+    """
+    Backwards-compatible tuple for identification results:
+    Unpacks as (worker_id, worker_name, confidence)
+    while exposing .allocated_manager attribute.
+    """
+    def __new__(cls, worker_id: Optional[str], worker_name: str, confidence: float, allocated_manager: str = "Unassigned"):
+        return super().__new__(cls, (worker_id, worker_name, confidence))
+
+    def __init__(self, worker_id: Optional[str], worker_name: str, confidence: float, allocated_manager: str = "Unassigned"):
+        self.worker_id = worker_id
+        self.worker_name = worker_name
+        self.confidence = confidence
+        self.allocated_manager = allocated_manager
+
+
+class ConsensusResult(tuple):
+    """
+    Backwards-compatible tuple for temporal consensus results:
+    Unpacks as (worker_id, worker_name, confidence, is_verified)
+    while exposing .allocated_manager attribute.
+    """
+    def __new__(cls, worker_id: Optional[str], worker_name: str, confidence: float, is_verified: bool, allocated_manager: str = "Unassigned"):
+        return super().__new__(cls, (worker_id, worker_name, confidence, is_verified))
+
+    def __init__(self, worker_id: Optional[str], worker_name: str, confidence: float, is_verified: bool, allocated_manager: str = "Unassigned"):
+        self.worker_id = worker_id
+        self.worker_name = worker_name
+        self.confidence = confidence
+        self.is_verified = is_verified
+        self.allocated_manager = allocated_manager
 
 
 class FeatureExtractor:
@@ -98,15 +134,17 @@ class WorkerIdentifier:
                     # Metadata file (optional)
                     meta_path = os.path.join(self.embeddings_dir, f"{worker_id}.json")
                     worker_name = worker_id
+                    allocated_manager = "Unassigned"
                     if os.path.exists(meta_path):
-                        import json
                         with open(meta_path, "r", encoding="utf-8") as f:
                             meta = json.load(f)
                             worker_name = meta.get("worker_name", worker_id)
+                            allocated_manager = meta.get("allocated_manager", meta.get("manager", "Unassigned"))
 
                     self.gallery[worker_id] = {
                         "worker_id": worker_id,
                         "worker_name": worker_name,
+                        "allocated_manager": allocated_manager,
                         "embedding": emb,
                     }
                 except Exception as e:
@@ -120,6 +158,7 @@ class WorkerIdentifier:
         worker_id: str,
         worker_name: str,
         image_or_crop: np.ndarray,
+        allocated_manager: str = "Unassigned",
         save_to_disk: bool = True,
     ) -> bool:
         """
@@ -132,6 +171,7 @@ class WorkerIdentifier:
         self.gallery[worker_id] = {
             "worker_id": worker_id,
             "worker_name": worker_name,
+            "allocated_manager": allocated_manager,
             "embedding": feat,
         }
 
@@ -140,30 +180,62 @@ class WorkerIdentifier:
             emb_path = os.path.join(self.embeddings_dir, f"{worker_id}.npy")
             np.save(emb_path, feat)
 
-            import json
             meta_path = os.path.join(self.embeddings_dir, f"{worker_id}.json")
             with open(meta_path, "w", encoding="utf-8") as f:
-                json.dump({"worker_id": worker_id, "worker_name": worker_name}, f, indent=2)
+                json.dump({
+                    "worker_id": worker_id,
+                    "worker_name": worker_name,
+                    "allocated_manager": allocated_manager,
+                }, f, indent=2)
 
         return True
 
-    def identify_crop(self, crop: np.ndarray) -> Tuple[Optional[str], str, float]:
+    def remove_worker(self, worker_id: str) -> bool:
+        """Remove worker from gallery memory and disk."""
+        removed = False
+        if worker_id in self.gallery:
+            del self.gallery[worker_id]
+            removed = True
+
+        emb_path = os.path.join(self.embeddings_dir, f"{worker_id}.npy")
+        if os.path.exists(emb_path):
+            try:
+                os.remove(emb_path)
+            except Exception:
+                pass
+        meta_path = os.path.join(self.embeddings_dir, f"{worker_id}.json")
+        if os.path.exists(meta_path):
+            try:
+                os.remove(meta_path)
+            except Exception:
+                pass
+
+        return removed
+
+    def identify_crop(self, crop: np.ndarray) -> IdentificationResult:
         """
         Compare query crop against enrolled worker gallery.
 
         Returns:
-            Tuple of (worker_id or None, worker_name, confidence).
-            If confidence < threshold or gallery empty -> (None, 'UNKNOWN', conf).
+            IdentificationResult tuple:
+            (worker_id or None, worker_name, confidence)
+            with .allocated_manager accessible.
         """
         if not self.gallery:
-            return None, "UNKNOWN", 0.0
+            return IdentificationResult(None, "UNKNOWN", 0.0, "Unassigned")
+
+        # Check presentation attack / screen display
+        spoof_detected, _ = quality_checker.detect_presentation_attack(crop)
+        if spoof_detected:
+            return IdentificationResult(None, "UNKNOWN (SPOOF DETECTED)", 0.0, "Unassigned")
 
         query_emb = self.extractor.extract_embedding(crop)
         if query_emb is None:
-            return None, "UNKNOWN", 0.0
+            return IdentificationResult(None, "UNKNOWN", 0.0, "Unassigned")
 
         best_id: Optional[str] = None
         best_name: str = "UNKNOWN"
+        best_manager: str = "Unassigned"
         best_sim: float = -1.0
 
         for worker_id, data in self.gallery.items():
@@ -174,12 +246,15 @@ class WorkerIdentifier:
                 best_sim = sim
                 best_id = worker_id
                 best_name = data["worker_name"]
+                best_manager = data.get("allocated_manager", "Unassigned")
 
         # Confidence verification check
         if best_sim >= self.confidence_threshold and best_id is not None:
-            return best_id, best_name, best_sim
+            return IdentificationResult(best_id, best_name, best_sim, best_manager)
         else:
-            return None, "UNKNOWN", max(0.0, best_sim)
+            return IdentificationResult(None, "UNKNOWN", max(0.0, best_sim), "Unassigned")
+
+    identify = identify_crop
 
 
 class TemporalConsensusTracker:
@@ -191,15 +266,14 @@ class TemporalConsensusTracker:
 
     def __init__(self, required_consensus_frames: int = 5):
         self.required_consensus = required_consensus_frames
-        # track_id -> deque of recent (worker_id, confidence)
+        # track_id -> deque of recent (worker_id, confidence, manager)
         self.history: Dict[int, deque] = defaultdict(lambda: deque(maxlen=self.required_consensus))
-        # track_id -> locked verified info: {"worker_id": str, "worker_name": str, "conf": float}
+        # track_id -> locked verified info: {"worker_id": str, "worker_name": str, "conf": float, "allocated_manager": str}
         self.locked_identities: Dict[int, Dict[str, any]] = {}
 
     @property
     def consensus_records(self) -> Dict[int, Dict[str, any]]:
         return self.locked_identities
-
 
     def update(
         self,
@@ -207,53 +281,65 @@ class TemporalConsensusTracker:
         raw_worker_id: Optional[str],
         raw_worker_name: str,
         confidence: float,
-    ) -> Tuple[Optional[str], str, float, bool]:
+        allocated_manager: str = "Unassigned",
+    ) -> ConsensusResult:
         """
         Update temporal history for a given track ID.
 
         Returns:
-            Tuple of (verified_worker_id, verified_name, verified_confidence, is_verified).
+            ConsensusResult tuple: (verified_worker_id, verified_name, verified_confidence, is_verified)
+            with .allocated_manager accessible.
         """
         # If this track ID has already been conclusively verified and locked:
         if track_id in self.locked_identities:
             locked = self.locked_identities[track_id]
-            return locked["worker_id"], locked["worker_name"], locked["confidence"], True
+            return ConsensusResult(
+                locked["worker_id"],
+                locked["worker_name"],
+                locked["confidence"],
+                True,
+                locked.get("allocated_manager", "Unassigned"),
+            )
 
         # Append current frame observation
-        self.history[track_id].append((raw_worker_id, raw_worker_name, confidence))
+        self.history[track_id].append((raw_worker_id, raw_worker_name, confidence, allocated_manager))
 
         records = list(self.history[track_id])
         if len(records) < self.required_consensus:
             # Insufficient frames accumulated yet -> keep UNKNOWN status
-            return None, "UNKNOWN", confidence, False
+            return ConsensusResult(None, "UNKNOWN", confidence, False, "Unassigned")
 
         # Count occurrences of identified worker IDs
         valid_votes = [r for r in records if r[0] is not None]
         if len(valid_votes) < self.required_consensus:
             # Not enough valid non-unknown votes in the window
-            return None, "UNKNOWN", confidence, False
+            return ConsensusResult(None, "UNKNOWN", confidence, False, "Unassigned")
 
         # Tally candidate worker IDs
         counts = defaultdict(int)
         conf_sums = defaultdict(float)
         names = {}
-        for wid, wname, conf in valid_votes:
+        managers = {}
+        for wid, wname, conf, mgr in valid_votes:
             counts[wid] += 1
             conf_sums[wid] += conf
             names[wid] = wname
+            managers[wid] = mgr
 
         best_wid, vote_count = max(counts.items(), key=lambda item: item[1])
         if vote_count >= self.required_consensus:
             avg_conf = conf_sums[best_wid] / vote_count
+            best_manager = managers.get(best_wid, "Unassigned")
             verified_info = {
                 "worker_id": best_wid,
                 "worker_name": names[best_wid],
                 "confidence": avg_conf,
+                "allocated_manager": best_manager,
             }
             self.locked_identities[track_id] = verified_info
-            return best_wid, names[best_wid], avg_conf, True
+            return ConsensusResult(best_wid, names[best_wid], avg_conf, True, best_manager)
 
-        return None, "UNKNOWN", confidence, False
+        return ConsensusResult(None, "UNKNOWN", confidence, False, "Unassigned")
 
     def reset_track(self, track_id: int):
         """Clear memory for lost track."""

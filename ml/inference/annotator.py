@@ -166,26 +166,29 @@ class VideoAnnotator:
         x, y = origin
         h_frame, w_frame = img.shape[:2]
 
-        # Primary name / identity label
+        # Primary name / identity label & Allocated Manager
         if worker.is_verified:
-            name_text = f"{worker.worker_name} ({worker.worker_id})"
-        elif worker.worker_name != "UNKNOWN":
+            name_text = f"{worker.worker_name} ({worker.worker_id}) | Mgr: {getattr(worker, 'allocated_manager', 'Unassigned')}"
+            att_text = getattr(worker, 'attendance_display_status', 'Attendance Marked')
+        elif worker.worker_name and worker.worker_name not in ("UNKNOWN", "UNKNOWN PERSON"):
             name_text = f"{worker.worker_name}? ({int(worker.id_confidence * 100)}%)"
+            att_text = "Verification In Progress..."
         else:
-            name_text = f"Worker #{worker.track_id} [UNKNOWN]"
+            name_text = f"UNKNOWN PERSON (Track #{worker.track_id})"
+            att_text = "Unknown Worker — Attendance Not Marked"
 
-        # Safety & Zone status line
-        status_text = f"{worker.safety_status.replace('_', ' ')} | {worker.zone_name}"
+        # Safety status line
+        status_text = f"Status: {worker.safety_status.replace('_', ' ')}"
 
         # PPE chips line: [H:✓] [V:✗] [G:?]
-        h_sym = "✓" if worker.helmet_status == "COMPLIANT" else ("✗" if worker.helmet_status == "VIOLATION" else "?")
-        v_sym = "✓" if worker.vest_status == "COMPLIANT" else ("✗" if worker.vest_status == "VIOLATION" else "?")
-        g_sym = "✓" if worker.gloves_status == "COMPLIANT" else ("✗" if worker.gloves_status == "VIOLATION" else "?")
-        ppe_text = f"PPE [H:{h_sym} V:{v_sym} G:{g_sym}]"
+        h_sym = "✓" if worker.helmet_status == "COMPLIANT" else ("✗" if worker.helmet_status == "VIOLATION" else ("N/V" if worker.helmet_status == "NOT VISIBLE" else "?"))
+        v_sym = "✓" if worker.vest_status == "COMPLIANT" else ("✗" if worker.vest_status == "VIOLATION" else ("N/V" if worker.vest_status == "NOT VISIBLE" else "?"))
+        g_sym = "✓" if worker.gloves_status == "COMPLIANT" else ("✗" if worker.gloves_status == "VIOLATION" else ("N/V" if worker.gloves_status == "NOT VISIBLE" else "?"))
+        ppe_text = f"PPE [H:{h_sym} V:{v_sym} G:{g_sym}] | {att_text}"
 
         lines = [name_text, status_text, ppe_text]
-        card_w = max(210, max(len(l) * 8 for l in lines))
-        card_h = 58
+        card_w = max(260, max(len(l) * 8 for l in lines))
+        card_h = 62
         card_y = max(0, y - card_h - 4)
 
         # Draw dark badge background with colored border
@@ -197,8 +200,8 @@ class VideoAnnotator:
 
         # Draw text lines
         cv2.putText(img, name_text, (x + 10, card_y + 16), self.font, 0.44, (255, 255, 255), 1, cv2.LINE_AA)
-        cv2.putText(img, status_text, (x + 10, card_y + 34), self.font, 0.38, status_color, 1, cv2.LINE_AA)
-        cv2.putText(img, ppe_text, (x + 10, card_y + 50), self.font, 0.36, (200, 210, 220), 1, cv2.LINE_AA)
+        cv2.putText(img, status_text, (x + 10, card_y + 35), self.font, 0.38, status_color, 1, cv2.LINE_AA)
+        cv2.putText(img, ppe_text, (x + 10, card_y + 53), self.font, 0.34, (200, 220, 240), 1, cv2.LINE_AA)
 
     def _render_hud(self, img: np.ndarray, stats: Dict[str, any], active_workers: int) -> None:
         hud_x, hud_y = 16, 16

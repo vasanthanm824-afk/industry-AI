@@ -217,23 +217,40 @@ export default function CCTVPage() {
       ctx.stroke();
 
       // Header Label Badge (Worker ID / Name / Track ID)
-      const labelName = w.worker_name && w.worker_name !== 'UNKNOWN' ? w.worker_name : `Person #${w.track_id}`;
+      // Header Label Badge (Worker Name / ID / Allocated Manager / Attendance)
+      const isRegistered = w.is_verified && w.worker_id;
+      const labelName = isRegistered
+        ? `${w.worker_name} (${w.worker_id}) | Mgr: ${w.allocated_manager || 'Kumar'}`
+        : `UNKNOWN PERSON (Track #${w.track_id})`;
       const confPct = w.confidence ? Math.round(w.confidence * 100) : 0;
-      const labelText = `${labelName} | Track #${w.track_id} (${confPct}%)`;
+      const attText = isRegistered
+        ? (w.attendance_status || 'Attendance Marked')
+        : 'Unknown Worker — Attendance Not Marked';
+
+      const line1 = `${labelName} (${confPct}%)`;
+      const line2 = `Status: ${w.safety_status || 'SAFE'} | ${attText}`;
+
       ctx.font = 'bold 11px monospace';
-      const textMetrics = ctx.measureText(labelText);
-      const badgeW = textMetrics.width + 16;
-      const badgeH = 20;
+      const m1 = ctx.measureText(line1).width;
+      ctx.font = '9px monospace';
+      const m2 = ctx.measureText(line2).width;
+      const badgeW = Math.max(m1, m2) + 16;
+      const badgeH = 34;
 
       const badgeY = Math.max(0, y1 - badgeH - 3);
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
       ctx.fillRect(x1, badgeY, badgeW, badgeH);
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 1;
       ctx.strokeRect(x1, badgeY, badgeW, badgeH);
 
+      ctx.font = 'bold 11px monospace';
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(labelText, x1 + 8, badgeY + 14);
+      ctx.fillText(line1, x1 + 8, badgeY + 14);
+
+      ctx.font = '9px monospace';
+      ctx.fillStyle = isRegistered ? '#34d399' : '#fb923c';
+      ctx.fillText(line2, x1 + 8, badgeY + 27);
 
       // Mini PPE Compliance Pills underneath box
       const ppeItems = [

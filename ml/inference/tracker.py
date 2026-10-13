@@ -32,9 +32,12 @@ class TrackedObject:
     history: List[Tuple[int, int]] = field(default_factory=list)
     worker_id: Optional[str] = None
     worker_name: str = "UNKNOWN"
+    allocated_manager: str = "Unassigned"
     id_confidence: float = 0.0
     is_verified: bool = False
     attendance_marked: bool = False
+    attendance_display_status: str = "Unknown Worker — Attendance Not Marked"
+    quality_warning: Optional[str] = None
     helmet_status: str = "UNKNOWN"
     vest_status: str = "UNKNOWN"
     gloves_status: str = "UNKNOWN"

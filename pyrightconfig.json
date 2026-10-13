@@ -1,0 +1,10 @@
+{
+  "venvPath": "e:\\industrial-safety-ai",
+  "venv": "venv_new",
+  "extraPaths": [
+    "e:\\industrial-safety-ai",
+    "e:\\industrial-safety-ai\\venv_new\\Lib\\site-packages"
+  ],
+  "reportMissingImports": false,
+  "reportMissingTypeStubs": false
+}

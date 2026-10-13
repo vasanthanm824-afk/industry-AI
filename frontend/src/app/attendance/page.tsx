@@ -6,14 +6,14 @@ import {
   Calendar,
   Download,
   Users,
-  CheckCircle,
-  RefreshCw,
   Search,
+  Briefcase,
+  CheckCircle2,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 export default function AttendancePage() {
-  const [date, setDate] = useState<string>('2026-10-07');
+  const [date, setDate] = useState<string>('');
   const [data, setData] = useState<any>({
     records: [],
     total_present: 0,
@@ -36,7 +36,6 @@ export default function AttendancePage() {
   };
 
   useEffect(() => {
-    // Default to today
     const today = new Date().toISOString().split('T')[0];
     setDate(today);
     fetchAttendance(today);
@@ -51,26 +50,28 @@ export default function AttendancePage() {
     (r: any) =>
       r.worker_name.toLowerCase().includes(search.toLowerCase()) ||
       r.worker_id.toLowerCase().includes(search.toLowerCase()) ||
-      (r.department && r.department.toLowerCase().includes(search.toLowerCase()))
+      (r.allocated_manager && r.allocated_manager.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
     <div className="space-y-6">
       {/* Top Banner & Date Filter */}
-      <div className="glass-panel p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
         <div>
-          <div className="flex items-center gap-2">
-            <CalendarCheck className="w-6 h-6 text-emerald-400" />
-            <h2 className="text-xl font-bold text-white tracking-wide">Shift Attendance Roster</h2>
+          <div className="flex items-center gap-2.5">
+            <CalendarCheck className="w-6 h-6 text-orange-400" />
+            <h2 className="text-xl font-bold text-white tracking-wide font-mono">
+              SENTINEL-X Shift Attendance
+            </h2>
           </div>
           <p className="text-xs text-gray-400 mt-1">
-            Automated biometric entry verification via CCTV and temporal consensus tracking.
+            Automated biometric entry verification via webcam. Attendance marked exactly once per worker per date.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-industrial-950 px-3 py-1.5 rounded-lg border border-industrial-700">
-            <Calendar className="w-4 h-4 text-safety-cyan" />
+          <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+            <Calendar className="w-4 h-4 text-orange-400" />
             <input
               type="date"
               value={date}
@@ -81,10 +82,10 @@ export default function AttendancePage() {
 
           <a
             href={`/api/reports/attendance?date=${date}&format=csv`}
-            download={`attendance_${date}.csv`}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-industrial-800 hover:bg-industrial-700 text-xs text-gray-300 border border-industrial-700 transition-colors"
+            download={`sentinel_x_attendance_${date}.csv`}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-gray-300 border border-slate-700 transition-colors font-mono cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 text-safety-cyan" />
+            <Download className="w-3.5 h-3.5 text-orange-400" />
             <span>Export CSV</span>
           </a>
         </div>
@@ -92,24 +93,24 @@ export default function AttendancePage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="glass-card p-4 rounded-xl border border-industrial-700/60">
-          <span className="text-xs font-mono text-gray-400 uppercase">Workers Present</span>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-lg">
+          <span className="text-xs font-mono text-gray-400 uppercase">Workers Present Today</span>
           <div className="text-2xl font-bold text-white font-mono mt-1">{data.total_present}</div>
-          <span className="text-[11px] text-gray-400">Checked in on {date}</span>
+          <span className="text-[11px] text-emerald-400 font-mono">Shift attendance logged</span>
         </div>
 
-        <div className="glass-card p-4 rounded-xl border border-industrial-700/60">
-          <span className="text-xs font-mono text-gray-400 uppercase">Total Enrolled</span>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-lg">
+          <span className="text-xs font-mono text-gray-400 uppercase">Total Registered Workers</span>
           <div className="text-2xl font-bold text-white font-mono mt-1">{data.total_registered}</div>
-          <span className="text-[11px] text-gray-400">Active biometric registry</span>
+          <span className="text-[11px] text-gray-400 font-mono">Enrolled biometric database</span>
         </div>
 
-        <div className="glass-card p-4 rounded-xl border border-industrial-700/60">
-          <span className="text-xs font-mono text-gray-400 uppercase">Turnout Rate</span>
-          <div className="text-2xl font-bold text-emerald-400 font-mono mt-1">
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-lg">
+          <span className="text-xs font-mono text-gray-400 uppercase">Attendance Rate</span>
+          <div className="text-2xl font-bold text-orange-400 font-mono mt-1">
             {data.attendance_rate}%
           </div>
-          <span className="text-[11px] text-gray-400">Shift workforce participation</span>
+          <span className="text-[11px] text-gray-400 font-mono">Daily workforce turnout</span>
         </div>
       </div>
 
@@ -118,50 +119,53 @@ export default function AttendancePage() {
         <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
         <input
           type="text"
-          placeholder="Search roster by worker or department..."
+          placeholder="Search by worker name, ID, or manager..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 bg-industrial-900 border border-industrial-700 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-safety-cyan"
+          className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 font-mono"
         />
       </div>
 
       {/* Roster Table */}
-      <div className="glass-panel p-5 rounded-2xl overflow-hidden">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-industrial-950/80 text-gray-400 uppercase text-[10px] border-b border-industrial-800">
+            <thead className="bg-slate-950 text-gray-400 uppercase text-[10px] border-b border-slate-800">
               <tr>
-                <th className="py-3 px-3">Worker ID</th>
-                <th className="py-3 px-3">Worker Name</th>
-                <th className="py-3 px-3">Department</th>
-                <th className="py-3 px-3">First Seen (Entry)</th>
-                <th className="py-3 px-3">Last Seen</th>
-                <th className="py-3 px-3">Track ID</th>
-                <th className="py-3 px-3">Confidence</th>
-                <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3.5">Worker ID</th>
+                <th className="py-3 px-3.5">Worker Name</th>
+                <th className="py-3 px-3.5">Allocated Manager</th>
+                <th className="py-3 px-3.5">First Seen (Check-in)</th>
+                <th className="py-3 px-3.5">Last Seen</th>
+                <th className="py-3 px-3.5">Confidence</th>
+                <th className="py-3 px-3.5">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-industrial-800/60">
+            <tbody className="divide-y divide-slate-800">
               {filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400">
-                    No attendance records found for date {date}.
+                  <td colSpan={7} className="py-12 text-center text-gray-400">
+                    No attendance records logged for date {date}. Confidently recognized workers will be recorded automatically once.
                   </td>
                 </tr>
               ) : (
                 filteredRecords.map((r: any) => (
-                  <tr key={r.id} className="hover:bg-industrial-800/40">
-                    <td className="py-3 px-3 text-cyan-400 font-bold">{r.worker_id}</td>
-                    <td className="py-3 px-3 text-white font-sans font-medium">{r.worker_name}</td>
-                    <td className="py-3 px-3 text-gray-300 font-sans">{r.department || 'Operations'}</td>
-                    <td className="py-3 px-3 text-gray-300">{r.first_seen_time}</td>
-                    <td className="py-3 px-3 text-gray-300">{r.last_seen_time}</td>
-                    <td className="py-3 px-3 text-gray-400">#{r.track_id}</td>
-                    <td className="py-3 px-3 text-emerald-400 font-bold">
+                  <tr key={r.id} className="hover:bg-slate-800/50 transition-colors">
+                    <td className="py-3 px-3.5 text-orange-400 font-bold">{r.worker_id}</td>
+                    <td className="py-3 px-3.5 text-white font-semibold">{r.worker_name}</td>
+                    <td className="py-3 px-3.5">
+                      <div className="flex items-center gap-1.5 text-slate-300">
+                        <Briefcase className="w-3.5 h-3.5 text-orange-400" />
+                        <span>{r.allocated_manager || 'Unassigned'}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3.5 text-gray-300">{r.first_seen_time}</td>
+                    <td className="py-3 px-3.5 text-gray-300">{r.last_seen_time}</td>
+                    <td className="py-3 px-3.5 text-orange-400 font-bold">
                       {(r.confidence * 100).toFixed(1)}%
                     </td>
-                    <td className="py-3 px-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                    <td className="py-3 px-3.5">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/70 text-emerald-400 border border-emerald-800/80">
                         {r.attendance_status}
                       </span>
                     </td>

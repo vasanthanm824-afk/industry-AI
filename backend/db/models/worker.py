@@ -18,6 +18,7 @@ class Worker(Base):
     role = Column(String(64), nullable=True, default="Worker")
     photo_path = Column(String(256), nullable=True)
     embedding_path = Column(String(256), nullable=True)
+    allocated_manager = Column(String(128), nullable=True, default="Unassigned")
     registered_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
 
@@ -26,8 +27,9 @@ class Worker(Base):
             "id": self.id,
             "worker_id": self.worker_id,
             "worker_name": self.worker_name,
-            "department": self.department,
-            "role": self.role,
+            "allocated_manager": self.allocated_manager or "Unassigned",
+            "department": self.department or "Operations",
+            "role": self.role or "Worker",
             "photo_path": self.photo_path,
             "embedding_path": self.embedding_path,
             "registered_at": self.registered_at.isoformat() if self.registered_at else None,

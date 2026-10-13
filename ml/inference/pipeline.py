@@ -6,6 +6,7 @@ zone geofencing, safety status engine, and real-time visual output.
 """
 
 from collections import deque
+from datetime import datetime
 import os
 import time
 from typing import Dict, Generator, List, Optional, Tuple, Union
@@ -176,6 +177,8 @@ class SafetyVisionPipeline:
 
         # Step 3: Worker Identification & Temporal Verification
         frame_h, frame_w = frame.shape[:2]
+        today_date_str = datetime.now().strftime("%Y-%m-%d")
+
         for worker in tracked_objects:
             x1, y1, x2, y2 = worker.bbox
             cx1, cy1 = max(0, x1), max(0, y1)
@@ -186,37 +189,53 @@ class SafetyVisionPipeline:
                 existing_ver = self.consensus.locked_identities.get(worker.track_id)
                 if existing_ver is not None:
                     worker.worker_id = existing_ver.get("worker_id")
-                    worker.worker_name = existing_ver.get("worker_name", "UNKNOWN")
+                    worker.worker_name = existing_ver.get("worker_name", "UNKNOWN PERSON")
+                    worker.allocated_manager = existing_ver.get("allocated_manager", "Unassigned")
                     worker.id_confidence = existing_ver.get("confidence", 0.0)
                     worker.is_verified = True
                 else:
                     worker_crop = frame[cy1:cy2, cx1:cx2]
-                    raw_wid, raw_name, raw_conf = self.identifier.identify_crop(worker_crop)
-                    wid, wname, conf, is_verified = self.consensus.update(
+                    id_res = self.identifier.identify_crop(worker_crop)
+                    raw_wid, raw_name, raw_conf = id_res[0], id_res[1], id_res[2]
+                    raw_mgr = getattr(id_res, "allocated_manager", "Unassigned")
+
+                    con_res = self.consensus.update(
                         track_id=worker.track_id,
                         raw_worker_id=raw_wid,
                         raw_worker_name=raw_name,
                         confidence=raw_conf,
+                        allocated_manager=raw_mgr,
                     )
+                    wid, wname, conf, is_verified = con_res[0], con_res[1], con_res[2], con_res[3]
 
                     worker.worker_id = wid
-                    worker.worker_name = wname
+                    worker.worker_name = wname if (wid is not None and is_verified) else "UNKNOWN PERSON"
+                    worker.allocated_manager = getattr(con_res, "allocated_manager", raw_mgr)
                     worker.id_confidence = conf
                     worker.is_verified = is_verified
 
-
                 # Step 4: Automatic Attendance Marking (Verified & Deduplicated)
-                if self.attendance_enabled and worker.is_verified and worker.worker_id is not None and not worker.attendance_marked:
-                    rec, is_new = self.attendance_service.mark_or_update_attendance(
-                        worker_id=worker.worker_id,
-                        worker_name=worker.worker_name,
-                        track_id=worker.track_id,
-                        confidence=worker.id_confidence,
-                    )
-                    worker.attendance_marked = True
-                    if is_new:
-                        print(f"\n[ATTENDANCE MARKED] {worker.worker_name} ({worker.worker_id}) | Track #{worker.track_id} | Time: {rec.first_seen_time} | Conf: {worker.id_confidence:.1%}")
-
+                if worker.is_verified and worker.worker_id is not None:
+                    is_present = self.attendance_service.is_worker_present_today(worker.worker_id, today_date_str)
+                    if is_present:
+                        worker.attendance_display_status = "Already Marked Today"
+                        worker.attendance_marked = True
+                    elif self.attendance_enabled and not worker.attendance_marked:
+                        rec, is_new = self.attendance_service.mark_or_update_attendance(
+                            worker_id=worker.worker_id,
+                            worker_name=worker.worker_name,
+                            track_id=worker.track_id,
+                            confidence=worker.id_confidence,
+                        )
+                        worker.attendance_marked = True
+                        worker.attendance_display_status = "Attendance Marked" if is_new else "Already Marked Today"
+                        if is_new:
+                            print(f"\n[ATTENDANCE MARKED] {worker.worker_name} ({worker.worker_id}) | Track #{worker.track_id} | Time: {rec.first_seen_time} | Conf: {worker.id_confidence:.1%}")
+                else:
+                    worker.worker_id = None
+                    worker.worker_name = "UNKNOWN PERSON"
+                    worker.attendance_display_status = "Unknown Worker — Attendance Not Marked"
+                    worker.attendance_marked = False
 
             # Step 5: PPE Verification
             ppe_res = self.ppe_detector.detect_ppe(frame, worker.bbox, track_id=worker.track_id)
@@ -250,8 +269,25 @@ class SafetyVisionPipeline:
                 zone_eval=zone_eval,
                 frame=frame,
             )
-            worker.safety_status = safety_eval.get("safety_status", "SAFE")
+            raw_safety = safety_eval.get("safety_status", "SAFE")
             worker.severity = safety_eval.get("severity", "LOW")
+
+            # Format safety status adhering strictly to industrial prompt specifications
+            if not worker.is_verified or worker.worker_id is None:
+                worker.worker_name = "UNKNOWN PERSON"
+                if ppe_res.overall_ppe_status == "VIOLATION":
+                    worker.safety_status = "UNKNOWN PERSON — PPE VIOLATION"
+                elif ppe_res.overall_ppe_status in ("UNKNOWN", "NOT VISIBLE"):
+                    worker.safety_status = "UNKNOWN PERSON — PPE UNVERIFIED"
+                else:
+                    worker.safety_status = "UNKNOWN PERSON — PPE COMPLIANT"
+            else:
+                if ppe_res.overall_ppe_status == "VIOLATION":
+                    worker.safety_status = "PPE_VIOLATION"
+                elif ppe_res.overall_ppe_status in ("UNKNOWN", "NOT VISIBLE"):
+                    worker.safety_status = "PPE UNVERIFIED"
+                else:
+                    worker.safety_status = raw_safety
 
         t_elapsed = time.perf_counter() - t0
         instant_fps = 1.0 / t_elapsed if t_elapsed > 0 else 0.0

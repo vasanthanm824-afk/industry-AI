@@ -33,6 +33,7 @@ def get_attendance(
     for r in records:
         w = db.query(Worker).filter(Worker.worker_id == r.worker_id).first()
         item = r.to_dict()
+        item["allocated_manager"] = getattr(w, "allocated_manager", "Unassigned") if w else "Unassigned"
         item["department"] = w.department if w else "Operations"
         item["role"] = w.role if w else "Worker"
         item["photo_path"] = w.photo_path if w else None

@@ -1,0 +1,9 @@
+[tool.pyright]
+venvPath = "."
+venv = "venv_new"
+extraPaths = [
+    ".",
+    "venv_new/Lib/site-packages"
+]
+reportMissingImports = false
+reportMissingTypeStubs = false

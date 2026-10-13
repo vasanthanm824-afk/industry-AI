@@ -87,6 +87,8 @@ class StreamManager:
                                 "track_id": w.track_id,
                                 "worker_id": w.worker_id,
                                 "worker_name": w.worker_name,
+                                "allocated_manager": getattr(w, "allocated_manager", "Unassigned"),
+                                "attendance_status": getattr(w, "attendance_display_status", "Unknown Worker — Attendance Not Marked"),
                                 "bbox": list(w.bbox),
                                 "confidence": round(w.confidence, 3),
                                 "id_confidence": round(w.id_confidence, 3),
@@ -239,6 +241,8 @@ async def websocket_inference(websocket: WebSocket):
                         "track_id": w.track_id,
                         "worker_id": w.worker_id,
                         "worker_name": w.worker_name,
+                        "allocated_manager": getattr(w, "allocated_manager", "Unassigned"),
+                        "attendance_status": getattr(w, "attendance_display_status", "Unknown Worker — Attendance Not Marked"),
                         "bbox": list(w.bbox),
                         "norm_bbox": [
                             round(w.bbox[0] / max(1, fw), 4),
@@ -324,6 +328,8 @@ def post_frame_inference(payload: dict):
                 "track_id": w.track_id,
                 "worker_id": w.worker_id,
                 "worker_name": w.worker_name,
+                "allocated_manager": getattr(w, "allocated_manager", "Unassigned"),
+                "attendance_status": getattr(w, "attendance_display_status", "Unknown Worker — Attendance Not Marked"),
                 "bbox": list(w.bbox),
                 "norm_bbox": [
                     round(w.bbox[0] / max(1, fw), 4),
